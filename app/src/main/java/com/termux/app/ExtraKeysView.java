@@ -1,10 +1,15 @@
 package com.termux.app;
 
 import android.content.Context;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.MotionEvent;
+import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.ToggleButton;
@@ -20,6 +25,7 @@ import com.termux.view.TerminalView;
 public final class ExtraKeysView extends GridLayout {
 
     private static final int TEXT_COLOR = 0xFFFFFFFF;
+    private boolean bLongClick = false;
 
     public ExtraKeysView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -48,6 +54,18 @@ public final class ExtraKeysView extends GridLayout {
                 break;
             case "▼":
                 keyCode = KeyEvent.KEYCODE_DPAD_DOWN;
+                break;
+            case "HOME":
+                keyCode = KeyEvent.KEYCODE_MOVE_HOME;
+                break;
+            case "END":
+                keyCode = KeyEvent.KEYCODE_MOVE_END;
+                break;
+            case "PGUP":
+                keyCode = KeyEvent.KEYCODE_PAGE_UP;
+                break;
+            case "PGDN":
+                keyCode = KeyEvent.KEYCODE_PAGE_DOWN;
                 break;
             case "―":
                 chars = "-";
@@ -100,12 +118,25 @@ public final class ExtraKeysView extends GridLayout {
         return result;
     }
 
+    private final Handler handler = new Handler() {
+        public void handleMessage(Message msg) {
+            Button aResponse = (Button)msg.obj;
+            if ((null != aResponse)) {
+                sendKey(getRootView(), aResponse.getText().toString());
+                removeMessages(1000);
+                final Message msgObj = obtainMessage(1000, aResponse);
+                handler.sendMessageDelayed(msgObj, 100);
+            }
+        }
+    };
+
     void reload() {
         altButton = controlButton = null;
         removeAllViews();
 
         String[][] buttons = {
-            {"ESC", "CTRL", "ALT", "TAB", "―", "/", "|"}
+            {"ESC", "/", "|", "-", "▲", "$", "HOME", "PGUP"},
+            {"TAB", "CTRL", "ALT", "◀", "▼", "▶", "PGDN","END"}
         };
 
         final int rows = buttons.length;
@@ -160,13 +191,38 @@ public final class ExtraKeysView extends GridLayout {
                     }
                 });
 
+                button.setOnLongClickListener(new OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        bLongClick = true;
+                        final Message msgObj = handler.obtainMessage(1000, finalButton);
+                        handler.sendMessageDelayed(msgObj, 100);
+                        return true;
+                    }
+                });
+
+                button.setOnTouchListener(new OnTouchListener() {
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        View root = getRootView();
+                        if (event.getAction() == MotionEvent.ACTION_UP) {
+                            if (bLongClick) {
+                                handler.removeMessages(1000);
+                            }
+                        }
+                        return false;
+                    }
+                });
+
                 GridLayout.LayoutParams param = new GridLayout.LayoutParams();
                 param.height = param.width = 0;
                 param.rightMargin = param.topMargin = 0;
                 param.setGravity(Gravity.LEFT);
-                float weight = "▲▼◀▶".contains(buttonText) ? 0.7f : 1.f;
+                float weight = "▲▼◀▶".contains(buttonText) ? 0.7f : 1.0f;
+                weight = "/|-$".contains(buttonText) ? 0.1f : weight;
+                weight = "HOMEPGUPPGDN".contains(buttonText) ? 1.4f : weight;
                 param.columnSpec = GridLayout.spec(col, GridLayout.FILL, weight);
-                param.rowSpec = GridLayout.spec(row, GridLayout.FILL, 1.f);
+                param.rowSpec = GridLayout.spec(row, GridLayout.FILL, weight);
                 button.setLayoutParams(param);
 
                 addView(button);
