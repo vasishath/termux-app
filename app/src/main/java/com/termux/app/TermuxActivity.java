@@ -141,8 +141,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).build()).build();
     int mBellSoundId;
 
-    Animation mOnBellAnimation;
-
     private final BroadcastReceiver mBroadcastReceiever = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -212,8 +210,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
     @Override
     public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
-
-        mOnBellAnimation = AnimationUtils.loadAnimation(this, R.anim.on_bell);
 
         mSettings = new TermuxPreferences(this);
 
@@ -410,8 +406,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
             public void onBell(TerminalSession session) {
                 if (!mIsVisible) return;
 
-                mTerminalView.startAnimation(mOnBellAnimation);
-
                 switch (mSettings.mBellBehaviour) {
                     case TermuxPreferences.BELL_BEEP:
                         mBellSoundPool.play(mBellSoundId, 1.f, 1.f, 1, 0, 1.f);
@@ -522,7 +516,13 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
                 finish();
             }
         } else {
-            switchToSession(getStoredCurrentSessionOrLast());
+            Intent i = getIntent();
+            if (i != null && Intent.ACTION_RUN.equals(i.getAction())) {
+                // Android 7.1 app shortcut from res/xml/shortcuts.xml.
+                addNewSession(false, null);
+            } else {
+                switchToSession(getStoredCurrentSessionOrLast());
+            }
         }
     }
 

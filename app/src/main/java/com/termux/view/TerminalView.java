@@ -238,8 +238,9 @@ public final class TerminalView extends View {
         // https://github.com/termux/termux-app/issues/137 (japanese chars and TYPE_NULL).
         outAttrs.inputType = InputType.TYPE_NULL;
 
-        // Let part of the application show behind when in landscape:
-        outAttrs.imeOptions |= EditorInfo.IME_FLAG_NO_FULLSCREEN;
+        // Note that IME_ACTION_NONE cannot be used as that makes it impossible to input newlines using the on-screen
+        // keyboard on Android TV (see https://github.com/termux/termux-app/issues/221).
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN;
 
         return new BaseInputConnection(this, true) {
 
@@ -270,15 +271,14 @@ public final class TerminalView extends View {
 
             @Override
             public boolean deleteSurroundingText(int leftLength, int rightLength) {
-                if (LOG_KEY_EVENTS)
+                if (LOG_KEY_EVENTS) {
                     Log.i(EmulatorDebug.LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
-                // If leftLength=2 it may be due to a UTF-16 surrogate pair. So we cannot send
-                // multiple key events for that. Let's just hope that keyboards don't use
-                // leftLength > 1 for other purposes (such as holding down backspace for repeat).
-                sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+                }
+                // The stock Samsung keyboard with 'Auto check spelling' enabled sends leftLength > 1.
+                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
+                for (int i = 0; i < leftLength; i++) sendKeyEvent(deleteKey);
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
-
 
             void sendTextToTerminal(CharSequence text) {
                 final int textLengthInChars = text.length();
@@ -298,6 +298,14 @@ public final class TerminalView extends View {
 
                     boolean ctrlHeld = false;
                     if (codePoint <= 31 && codePoint != 27) {
+                        if (codePoint == '\n') {
+                            // The AOSP keyboard and descendants seems to send \n as text when the enter key is pressed,
+                            // instead of a key event like most other keyboard apps. A terminal expects \r for the enter
+                            // key (although when icrnl is enabled this doesn't make a difference - run 'stty -icrnl' to
+                            // check the behaviour).
+                            codePoint = '\r';
+                        }
+
                         // E.g. penti keyboard for ctrl input.
                         ctrlHeld = true;
                         switch (codePoint) {

@@ -1,4 +1,4 @@
-sudo: false
+sudo: true
 language: android
 jdk: oraclejdk8
 
@@ -12,13 +12,14 @@ android:
   components:
     - platform-tools
     - tools
-    - build-tools-25.0.0
+    - build-tools-25.0.2
     - android-25
     - extra-android-m2repository
 
 before_install:
   - git clone https://github.com/urho3d/android-ndk.git $HOME/android-ndk
   - export ANDROID_NDK_HOME=$HOME/android-ndk
+  - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-certificates.crt
 
 script:
   - ./gradlew testDebugUnitTest
@@ -30,5 +31,5 @@ addons:
       description: "Terminal emulator and Linux environment for Android"
     notification_email: fredrik@fornwall.net
     build_command_prepend: "./gradlew clean"
-    build_command: "./gradlew assemble"
-    branch_pattern: coverity_scan
+    build_command: "./gradlew build"
+    branch_pattern: master
