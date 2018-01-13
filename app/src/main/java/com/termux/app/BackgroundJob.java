@@ -116,8 +116,9 @@ public final class BackgroundJob {
             final String langEnv = "LANG=en_US.UTF-8";
             final String pathEnv = "PATH=" + TermuxService.PREFIX_PATH + "/bin:" + TermuxService.PREFIX_PATH + "/bin/applets";
             final String pwdEnv = "PWD=" + cwd;
+            final String tmpdirEnv = "TMPDIR=" + TermuxService.PREFIX_PATH + "/tmp";
 
-            return new String[]{termEnv, homeEnv, prefixEnv, ps1Env, ldEnv, langEnv, pathEnv, pwdEnv, androidRootEnv, androidDataEnv, externalStorageEnv};
+            return new String[]{termEnv, homeEnv, prefixEnv, ps1Env, ldEnv, langEnv, pathEnv, pwdEnv, androidRootEnv, androidDataEnv, externalStorageEnv, tmpdirEnv};
         }
     }
 
@@ -158,7 +159,6 @@ public final class BackgroundJob {
                             if (c == ' ' || c == '\n') {
                                 if (builder.length() == 0) {
                                     // Skip whitespace after shebang.
-                                    continue;
                                 } else {
                                     // End of shebang.
                                     String executable = builder.toString();

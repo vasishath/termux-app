@@ -7,13 +7,8 @@
    <string name="toggle_soft_keyboard">Keyboard</string>
    <string name="reset_terminal">Reset</string>
    <string name="style_terminal">Style</string>
-   <string name="toggle_fullscreen">Fullscreen</string>
    <string name="share_transcript_title">Terminal transcript</string>
    <string name="help">Help</string>
-
-   <string name="welcome_dialog_title">Welcome to Termux</string>
-   <string name="welcome_dialog_body">Long press and select <i>More…</i> to show a menu where <i>Help</i> is available.\n\nExecute <b>apt update</b> to update the packages list before installing packages.</string>
-   <string name="welcome_dialog_dont_show_again_button">Do not show again</string>
 
    <string name="bootstrap_installer_body">Installing…</string>
    <string name="bootstrap_error_title">Unable to install</string>
@@ -33,10 +28,6 @@
   <string name="select_url_no_found">No URL found in the terminal.</string>
   <string name="select_url_copied_to_clipboard">URL copied to clipboard</string>
   <string name="share_transcript_chooser_title">Send text to:</string>
-
-  <string name="paste_text">Paste</string>
-  <string name="copy_text">Copy</string>
-  <string name="text_selection_more">More…</string>
 
   <string name="kill_process">Kill process (%d)</string>
   <string name="confirm_kill_process">Really kill this session?</string>

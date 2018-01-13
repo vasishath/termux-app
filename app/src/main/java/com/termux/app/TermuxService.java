@@ -2,6 +2,7 @@ package com.termux.app;
 
 import android.annotation.SuppressLint;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -11,10 +12,10 @@ import android.content.res.Resources;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
-import android.support.v4.content.WakefulBroadcastReceiver;
 import android.util.Log;
 import android.widget.ArrayAdapter;
 
@@ -24,7 +25,6 @@ import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSession.SessionChangedCallback;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +41,8 @@ import java.util.List;
  * {@link #buildNotification()}.
  */
 public final class TermuxService extends Service implements SessionChangedCallback {
+
+    private static final String NOTIFICATION_CHANNEL_ID = "termux_notification_channel";
 
     /** Note that this is a symlink on the Android M preview. */
     @SuppressLint("SdCardPath")
@@ -105,7 +107,8 @@ public final class TermuxService extends Service implements SessionChangedCallba
                 mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, EmulatorDebug.LOG_TAG);
                 mWakeLock.acquire();
 
-                WifiManager wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+                // http://tools.android.com/tech-docs/lint-in-studio-2-3#TOC-WifiManager-Leak
+                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                 mWifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, EmulatorDebug.LOG_TAG);
                 mWifiLock.acquire();
 
@@ -153,11 +156,6 @@ public final class TermuxService extends Service implements SessionChangedCallba
             Log.e(EmulatorDebug.LOG_TAG, "Unknown TermuxService action: '" + action + "'");
         }
 
-        if ((flags & START_FLAG_REDELIVERY) == 0) {
-            // Service is started by WBR, not restarted by system, so release the WakeLock from WBR.
-            WakefulBroadcastReceiver.completeWakefulIntent(intent);
-        }
-
         // If this service really do get killed, there is no point restarting it automatically - let the user do on next
         // start of {@link Term):
         return Service.START_NOT_STICKY;
@@ -170,11 +168,12 @@ public final class TermuxService extends Service implements SessionChangedCallba
 
     @Override
     public void onCreate() {
+        setupNotificationChannel();
         startForeground(NOTIFICATION_ID, buildNotification());
     }
 
     /** Update the shown foreground service notification after making any changes that affect it. */
-    private void updateNotification() {
+    void updateNotification() {
         if (mWakeLock == null && mTerminalSessions.isEmpty() && mBackgroundTasks.isEmpty()) {
             // Exit if we are updating after the user disabled all locks with no sessions or tasks running.
             stopSelf();
@@ -208,14 +207,18 @@ public final class TermuxService extends Service implements SessionChangedCallba
         builder.setOngoing(true);
 
         // If holding a wake or wifi lock consider the notification of high priority since it's using power,
-        // otherwise use a minimal priority since this is just a background service notification:
-        builder.setPriority((wakeLockHeld) ? Notification.PRIORITY_HIGH : Notification.PRIORITY_MIN);
+        // otherwise use a low priority
+        builder.setPriority((wakeLockHeld) ? Notification.PRIORITY_HIGH : Notification.PRIORITY_LOW);
 
         // No need to show a timestamp:
         builder.setShowWhen(false);
 
         // Background color for small notification icon:
         builder.setColor(0xFF000000);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setChannelId(NOTIFICATION_CHANNEL_ID);
+        }
 
         Resources res = getResources();
         Intent exitIntent = new Intent(this, TermuxService.class).setAction(ACTION_STOP_SERVICE);
@@ -241,7 +244,6 @@ public final class TermuxService extends Service implements SessionChangedCallba
 
         for (int i = 0; i < mTerminalSessions.size(); i++)
             mTerminalSessions.get(i).finishIfRunning();
-        mTerminalSessions.clear();
     }
 
     public List<TerminalSession> getSessions() {
@@ -257,28 +259,11 @@ public final class TermuxService extends Service implements SessionChangedCallba
         boolean isLoginShell = false;
 
         if (executablePath == null) {
-            File shell = new File(HOME_PATH, ".termux/shell");
-            if (shell.exists()) {
-                try {
-                    File canonicalFile = shell.getCanonicalFile();
-                    if (canonicalFile.isFile() && canonicalFile.canExecute()) {
-                        executablePath = canonicalFile.getName().equals("busybox") ? (PREFIX_PATH + "/bin/ash") : canonicalFile.getAbsolutePath();
-                    } else {
-                        Log.w(EmulatorDebug.LOG_TAG, "$HOME/.termux/shell points to non-executable shell: " + canonicalFile.getAbsolutePath());
-                    }
-                } catch (IOException e) {
-                    Log.e(EmulatorDebug.LOG_TAG, "Error checking $HOME/.termux/shell", e);
-                }
-            }
-
-            if (executablePath == null) {
-                // Try bash, zsh and ash in that order:
-                for (String shellBinary : new String[]{"bash", "zsh", "ash"}) {
-                    File shellFile = new File(PREFIX_PATH + "/bin/" + shellBinary);
-                    if (shellFile.canExecute()) {
-                        executablePath = shellFile.getAbsolutePath();
-                        break;
-                    }
+            for (String shellBinary : new String[]{"login", "bash", "zsh"}) {
+                File shellFile = new File(PREFIX_PATH + "/bin/" + shellBinary);
+                if (shellFile.canExecute()) {
+                    executablePath = shellFile.getAbsolutePath();
+                    break;
                 }
             }
 
@@ -357,5 +342,18 @@ public final class TermuxService extends Service implements SessionChangedCallba
                 updateNotification();
             }
         });
+    }
+
+    private void setupNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+
+        String channelName = "Termux";
+        String channelDescription = "Notifications from Termux";
+        int importance = NotificationManager.IMPORTANCE_LOW;
+
+        NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, channelName,importance);
+        channel.setDescription(channelDescription);
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        manager.createNotificationChannel(channel);
     }
 }

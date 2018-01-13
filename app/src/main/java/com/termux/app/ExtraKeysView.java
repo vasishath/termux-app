@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.MotionEvent;
@@ -78,7 +79,7 @@ public final class ExtraKeysView extends GridLayout {
             view.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
             view.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
         } else {
-            TerminalView terminalView = (TerminalView) view.findViewById(R.id.terminal_view);
+            TerminalView terminalView = view.findViewById(R.id.terminal_view);
             TerminalSession session = terminalView.getCurrentSession();
             if (session != null) session.write(chars);
         }
@@ -175,6 +176,7 @@ public final class ExtraKeysView extends GridLayout {
                 button.setOnClickListener(new OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        finalButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                         View root = getRootView();
                         switch (buttonText) {
                             case "CTRL":
